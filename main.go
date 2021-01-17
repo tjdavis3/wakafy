@@ -12,6 +12,9 @@ import (
 	"github.com/aquilax/go-wakatime"
 	clockify "github.com/lucassabreu/clockify-cli/api"
 	"github.com/lucassabreu/clockify-cli/api/dto"
+
+	// Autoloads environment from .env
+	_ "github.com/joho/godotenv/autoload"
 )
 
 const progDesc = `
