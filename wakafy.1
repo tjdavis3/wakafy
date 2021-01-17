@@ -1,0 +1,27 @@
+.TH wakafy 1 "16 January 2021"
+.SH NAME
+wakafy \- Adds Wakatime entries to Clockify
+.SH SYNOPSIS
+\fBwakafy\fP {workspace} [OPTIONS]
+.SH DESCRIPTION
+
+Pulls all time entries from Wakatime and adds them to Clockify.
+
+.SH OPTIONS
+.SS Application Options
+.TP
+\fB\fB\-\-wakatime\fR <default: \fI$WAKATIME_KEY\fR> (\fIrequired\fR)\fP
+The API key for accessing Wakatime
+.TP
+\fB\fB\-\-clockify\fR <default: \fI$CLOCKIFY_KEY\fR> (\fIrequired\fR)\fP
+The API key for accessing Clockify
+.TP
+\fB\fB\-d\fR, \fB\-\-days\fR <default: \fI"7"\fR>\fP
+The number of days back to retrieve from Wakatime
+.TP
+\fB\fB\-p\fR, \fB\-\-projects\fR\fP
+Location of the yaml file to map wakatime projects to Clockify projects
+.SS Help Options
+.TP
+\fB\fB\-h\fR, \fB\-\-help\fR\fP
+Show this help message

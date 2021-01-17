@@ -1,6 +1,9 @@
 # github.com/aquilax/go-wakatime v0.1.1
 ## explicit
 github.com/aquilax/go-wakatime
+# github.com/jessevdk/go-flags v1.4.0
+## explicit
+github.com/jessevdk/go-flags
 # github.com/lucassabreu/clockify-cli v0.15.1
 ## explicit
 github.com/lucassabreu/clockify-cli/api
@@ -8,3 +11,6 @@ github.com/lucassabreu/clockify-cli/api/dto
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
+# gopkg.in/yaml.v2 v2.3.0
+## explicit
+gopkg.in/yaml.v2
