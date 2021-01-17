@@ -4,6 +4,10 @@ github.com/aquilax/go-wakatime
 # github.com/jessevdk/go-flags v1.4.0
 ## explicit
 github.com/jessevdk/go-flags
+# github.com/joho/godotenv v1.3.0
+## explicit
+github.com/joho/godotenv
+github.com/joho/godotenv/autoload
 # github.com/lucassabreu/clockify-cli v0.15.1
 ## explicit
 github.com/lucassabreu/clockify-cli/api
