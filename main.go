@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/aquilax/go-wakatime"
+	"github.com/eiannone/keyboard"
 	clockify "github.com/lucassabreu/clockify-cli/api"
 	"github.com/lucassabreu/clockify-cli/api/dto"
 
@@ -29,6 +30,7 @@ var Config = struct {
 	AddProjects  bool    `hidden:"true" short:"a" long:"add-projects" description:"If the Wakatime project does not exist in Clockify, add it, otherwise add the time without a project"`
 	WriteManPage bool    `long:"manpage" description:"Generates the manpage" hidden:"true"`
 	ProjectsFile *string `long:"projects" short:"p" description:"Location of the yaml file to map wakatime projects to Clockify projects"`
+	Interactive  bool    `long:"interactive" short:"i" description:"Run in interactive mode" `
 }{}
 
 type App struct {
@@ -138,6 +140,10 @@ func (app *App) GetWorkspace(workspace string) (workspaceID string) {
 
 // AddTime takes a wakatime durations and adds them to Clockify
 func (app *App) AddTime(summaries *wakatime.Durations) {
+	// var kbd *bufio.Reader
+	// if Config.Interactive {
+	// 	kbd = bufio.NewReader(os.Stdin)
+	// }
 	for _, entry := range summaries.Data {
 		// for _, project := range entry.Projects {
 		addProject := true
@@ -160,6 +166,36 @@ func (app *App) AddTime(summaries *wakatime.Durations) {
 		// start, _ := time.Parse(time.RFC3339, entry.Range.Start)
 		// end, _ := time.Parse(time.RFC3339, entry.Range.End)
 
+		var yn rune
+
+		if Config.Interactive {
+			for {
+				var err error
+				fmt.Printf("Add to project %s? (y/n/q) ", entry.Project)
+				yn, _, err = keyboard.GetSingleKey()
+				if err != nil {
+					panic(err)
+				}
+				// yn, err := kbd.ReadByte()
+
+				if yn == 'q' {
+					fmt.Println()
+					os.Exit(0)
+				}
+				if yn != 'y' && yn != 'n' {
+					fmt.Println("Invalid entry")
+					continue
+				} else {
+					fmt.Println()
+					break
+				}
+			}
+		} else {
+			yn = 'y'
+		}
+		if yn != 'y' {
+			continue
+		}
 		endUnix := entry.Time.Time().Unix() + int64(entry.Duration)
 		end := time.Unix(endUnix, 0)
 		fmt.Println(entry.Project, " from: ", entry.Time.Time(), " to: ", end)

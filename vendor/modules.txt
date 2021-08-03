@@ -1,6 +1,9 @@
 # github.com/aquilax/go-wakatime v0.1.1
 ## explicit
 github.com/aquilax/go-wakatime
+# github.com/eiannone/keyboard v0.0.0-20200508000154-caf4b762e807
+## explicit
+github.com/eiannone/keyboard
 # github.com/jessevdk/go-flags v1.4.0
 ## explicit
 github.com/jessevdk/go-flags
@@ -15,6 +18,11 @@ github.com/lucassabreu/clockify-cli/api/dto
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
+# golang.org/x/sys v0.0.0-20210521203332-0cec03c779c1
+## explicit
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
+golang.org/x/sys/windows
 # gopkg.in/yaml.v2 v2.3.0
 ## explicit
 gopkg.in/yaml.v2
