@@ -21,13 +21,13 @@ type Workspace struct {
 	Name        string            `json:"name"`
 	ImageURL    string            `json:"imageUrl"`
 	Settings    WorkspaceSettings `json:"workspaceSettings"`
-	HourlyRate  HourlyRate        `json:"hourlyRate"`
+	HourlyRate  Rate              `json:"hourlyRate"`
 	Memberships []Membership
 }
 
 // Membership DTO
 type Membership struct {
-	HourlyRate HourlyRate       `json:"hourlyRate"`
+	HourlyRate Rate             `json:"hourlyRate"`
 	Status     MembershipStatus `json:"membershipStatus"`
 	Type       string           `json:"membershipType"`
 	Target     string           `json:"target"`
@@ -51,22 +51,41 @@ const MembershipStatusInactive = MembershipStatus("INACTIVE")
 
 // WorkspaceSettings DTO
 type WorkspaceSettings struct {
-	CanSeeTimeSheet                    bool   `json:"canSeeTimeSheet"`
-	DefaultBillableProjects            bool   `json:"defaultBillableProjects"`
-	ForceDescription                   bool   `json:"forceDescription"`
-	ForceProjects                      bool   `json:"forceProjects"`
-	ForceTags                          bool   `json:"forceTags"`
-	ForceTasks                         bool   `json:"forceTasks"`
-	LockTimeEntries                    string `json:"lockTimeEntries"`
-	OnlyAdminsCreateProject            bool   `json:"onlyAdminsCreateProject"`
-	OnlyAdminsSeeAllTimeEntries        bool   `json:"onlyAdminsSeeAllTimeEntries"`
-	OnlyAdminsSeeBillableRates         bool   `json:"onlyAdminsSeeBillableRates"`
-	OnlyAdminsSeeDashboard             bool   `json:"onlyAdminsSeeDashboard"`
-	OnlyAdminsSeePublicProjectsEntries bool   `json:"onlyAdminsSeePublicProjectsEntries"`
-	ProjectFavorites                   bool   `json:"projectFavorites"`
-	ProjectPickerSpecialFilter         bool   `json:"projectPickerSpecialFilter"`
-	Round                              Round  `json:"round"`
-	TimeRoundingInReports              bool   `json:"timeRoundingInReports"`
+	AdminOnlyPages                     []string      `json:"adminOnlyPages"`
+	AutomaticLock                      AutomaticLock `json:"automaticLock"`
+	CanSeeTimeSheet                    bool          `json:"canSeeTimeSheet"`
+	DefaultBillableProjects            bool          `json:"defaultBillableProjects"`
+	ForceDescription                   bool          `json:"forceDescription"`
+	ForceProjects                      bool          `json:"forceProjects"`
+	ForceTags                          bool          `json:"forceTags"`
+	ForceTasks                         bool          `json:"forceTasks"`
+	LockTimeEntries                    time.Time     `json:"lockTimeEntries"`
+	OnlyAdminsCreateProject            bool          `json:"onlyAdminsCreateProject"`
+	OnlyAdminsCreateTag                bool          `json:"onlyAdminsCreateTag"`
+	OnlyAdminsCreateTask               bool          `json:"onlyAdminsCreateTask"`
+	OnlyAdminsSeeAllTimeEntries        bool          `json:"onlyAdminsSeeAllTimeEntries"`
+	OnlyAdminsSeeBillableRates         bool          `json:"onlyAdminsSeeBillableRates"`
+	OnlyAdminsSeeDashboard             bool          `json:"onlyAdminsSeeDashboard"`
+	OnlyAdminsSeePublicProjectsEntries bool          `json:"onlyAdminsSeePublicProjectsEntries"`
+	ProjectFavorites                   bool          `json:"projectFavorites"`
+	ProjectGroupingLabel               string        `json:"projectGroupingLabel"`
+	ProjectPickerSpecialFilter         bool          `json:"projectPickerSpecialFilter"`
+	Round                              Round         `json:"round"`
+	TimeRoundingInReports              bool          `json:"timeRoundingInReports"`
+	TrackTimeDownToSecond              bool          `json:"trackTimeDownToSecond"`
+	IsProjectPublicByDefault           bool          `json:"isProjectPublicByDefault"`
+	CanSeeTracker                      bool          `json:"canSeeTracker"`
+	FeatureSubscriptionType            string        `json:"featureSubscriptionType"`
+}
+
+// AutomaticLock DTO
+type AutomaticLock struct {
+	ChangeDay       string `json:"changeDay"`
+	DayOfMonth      int    `json:"dayOfMonth"`
+	FirstDay        string `json:"firstDay"`
+	OlderThanPeriod string `json:"olderThanPeriod"`
+	OlderThanValue  int    `json:"olderThanValue"`
+	Type            string `json:"type"`
 }
 
 // Round DTO
@@ -75,8 +94,8 @@ type Round struct {
 	Round   string `json:"round"`
 }
 
-// HourlyRate DTO
-type HourlyRate struct {
+// Rate DTO
+type Rate struct {
 	Amount   int32  `json:"amount"`
 	Currency string `json:"currency"`
 }
@@ -86,7 +105,7 @@ type TimeEntry struct {
 	ID            string       `json:"id"`
 	Billable      bool         `json:"billable"`
 	Description   string       `json:"description"`
-	HourlyRate    HourlyRate   `json:"hourlyRate"`
+	HourlyRate    Rate         `json:"hourlyRate"`
 	IsLocked      bool         `json:"isLocked"`
 	Project       *Project     `json:"project"`
 	ProjectID     string       `json:"projectId"`
@@ -123,31 +142,35 @@ const TaskStatusDone = TaskStatus("DONE")
 
 // Task DTO
 type Task struct {
-	ID         string     `json:"id"`
-	AssigneeID string     `json:"assigneeId"`
-	Estimate   string     `json:"estimate"`
-	Name       string     `json:"name"`
-	ProjectID  string     `json:"projectId"`
-	Status     TaskStatus `json:"status"`
+	AssigneeIDs []string   `json:"assigneeIds"`
+	Estimate    string     `json:"estimate"`
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	ProjectID   string     `json:"projectId"`
+	Billable    bool       `json:"billable"`
+	HourlyRate  Rate       `json:"hourlyRate"`
+	CostRate    Rate       `json:"costRate"`
+	Status      TaskStatus `json:"status"`
 }
 
 // Project DTO
 type Project struct {
-	ID          string       `json:"id"`
-	Name        string       `json:"name"`
-	HourlyRate  HourlyRate   `json:"hourlyRate"`
-	ClientID    string       `json:"clientId"`
-	WorkspaceID string       `json:"workspaceId"`
-	Billable    bool         `json:"billable"`
-	Memberships []Membership `json:"memberships"`
-	Color       string       `json:"color"`
-	Estimate    Estimate     `json:"estimate"`
-	Archived    bool         `json:"archived"`
-	Duration    string       `json:"duration"`
-	ClientName  string       `json:"clientName"`
-	Note        string       `json:"note"`
-	Template    bool         `json:"template"`
-	Public      bool         `json:"public"`
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	HourlyRate     Rate           `json:"hourlyRate"`
+	ClientID       string         `json:"clientId"`
+	WorkspaceID    string         `json:"workspaceId"`
+	Billable       bool           `json:"billable"`
+	Memberships    []Membership   `json:"memberships"`
+	Color          string         `json:"color"`
+	TimeEstimate   TimeEstimate   `json:"timeEstimate"`
+	BudgetEstimate BudgetEstimate `json:"budgetEstimate"`
+	Archived       bool           `json:"archived"`
+	Duration       string         `json:"duration"`
+	ClientName     string         `json:"clientName"`
+	Note           string         `json:"note"`
+	Template       bool           `json:"template"`
+	Public         bool           `json:"public"`
 }
 
 // EstimateType possible Estimate types
@@ -159,10 +182,23 @@ const EstimateTypeAuto = EstimateType("AUTO")
 // EstimateTypeManual estimate is Manual
 const EstimateTypeManual = EstimateType("MANUAL")
 
-// Estimate DTO
-type Estimate struct {
-	Estimate string       `json:"estimate"`
-	Type     EstimateType `json:"type"`
+// EstimateBase DTO
+type EstimateBase struct {
+	Type         EstimateType `json:"type"`
+	Active       bool         `json:"active"`
+	ResetOptions *string      `json:"resetOptions"`
+}
+
+// TimeEstimate DTO
+type TimeEstimate struct {
+	EstimateBase
+	Estimate string `json:"estimate"`
+}
+
+// BudgetEstimate DTO
+type BudgetEstimate struct {
+	EstimateBase
+	Estimate int `json:"estimate"`
 }
 
 // UserStatus possible user status
@@ -188,6 +224,18 @@ type User struct {
 	ProfilePicture   string       `json:"profilePicture"`
 	Settings         UserSettings `json:"settings"`
 	Status           UserStatus   `json:"status"`
+	Roles            *[]Role      `json:"roles"`
+}
+
+// Role DTO
+type Role struct {
+	Role     string       `json:"role"`
+	Entities []RoleEntity `json:"entities"`
+}
+
+type RoleEntity struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // WeekStart when the week starts
