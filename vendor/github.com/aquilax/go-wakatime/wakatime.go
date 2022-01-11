@@ -52,8 +52,8 @@ type DurationsData struct {
 type Durations struct {
 	Branches []string
 	Data     []DurationsData
-	End      string
-	Start    string
+	End      Time
+	Start    Time
 	TimeZone string
 }
 
@@ -64,7 +64,7 @@ type StatsItem struct {
 	ModifiedAt   time.Time `json:"modified_at"`
 	Name         string
 	Percent      float32
-	TotalSeconds float64 `json:"total_seconds"`
+	TotalSeconds int `json:"total_seconds"`
 }
 
 // HeartbeatItem contains single hartbeat item
@@ -86,8 +86,8 @@ type HeartbeatItem struct {
 // Heartbeats contains the Heartbeats report
 type Heartbeats struct {
 	Data     []HeartbeatItem
-	Start    string
-	End      string
+	Start    Time
+	End      Time
 	Timezone string
 }
 
@@ -122,7 +122,7 @@ type StatsData struct {
 	Status                    string
 	Timeout                   int
 	Timezone                  string
-	TotalSeconds              float64    `json:"total_seconds"`
+	TotalSeconds              int    `json:"total_seconds"`
 	UserID                    string `json:"user_id"`
 	Username                  string
 	WritesOnly                bool `json:"writes_only"`
@@ -140,7 +140,7 @@ type SummaryGrandTotal struct {
 	Minutes      int
 	Seconds      int
 	Text         string
-	TotalSeconds float64 `json:"total_seconds"`
+	TotalSeconds int `json:"total_seconds"`
 }
 
 // SummaryItem contains the summary item data
@@ -166,8 +166,8 @@ type SummaryProject SummaryItem
 type SummaryRange struct {
 	Date      string
 	DateHuman string `json:"date_human"`
-	End       string
-	Start     string
+	End       Time
+	Start     Time
 	Text      string
 	Timezone  string
 }
@@ -185,8 +185,8 @@ type SummariesData struct {
 // Summaries contains the whole summaries report
 type Summaries struct {
 	Data  []SummariesData
-	End   string
-	Start string
+	End   Time
+	Start Time
 }
 
 // UserData contains the data for the user report
@@ -294,7 +294,7 @@ func (wt *WakaTime) Summaries(user string, start, date time.Time, project, branc
 	u.Path += "users/" + user + "/summaries"
 	q := u.Query()
 	q.Set("start", start.Format(dateFormat))
-	q.Set("end", date.Format(dateFormat))
+	q.Set("end", start.Format(dateFormat))
 	if project != nil {
 		q.Set("project", *project)
 	}
@@ -354,11 +354,6 @@ func (wt *WakaTime) GetHartbeats(user string, date time.Time) (*Heartbeats, erro
 	return &h, nil
 }
 
-
-// String returns the string representation of Range
-func (r Range) String() string {
-	return string(r)
-}
 // UnmarshalJSON unmarshals the Time type
 func (t *Time) UnmarshalJSON(data []byte) error {
 	ts, err := strconv.ParseFloat(string(data), 32)
@@ -371,6 +366,10 @@ func (t *Time) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// String returns the string representation of Range
+func (r Range) String() string {
+	return string(r)
+}
 
 func (wt *WakaTime) fetchURL(url string) ([]byte, error) {
 	var err error
