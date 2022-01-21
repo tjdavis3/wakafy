@@ -1,0 +1,19 @@
+on:
+  push:
+    branches:
+      - master
+name: release-please
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: GoogleCloudPlatform/release-please-action@v2
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: go
+          package-name: wakafy
+      - name: Show output
+        run: echo ${{ steps.release.outputs.release_created }}
