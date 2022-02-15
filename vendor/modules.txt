@@ -11,7 +11,7 @@ github.com/jessevdk/go-flags
 ## explicit
 github.com/joho/godotenv
 github.com/joho/godotenv/autoload
-# github.com/lucassabreu/clockify-cli v0.28.0
+# github.com/lucassabreu/clockify-cli v0.32.0
 ## explicit
 github.com/lucassabreu/clockify-cli/api
 github.com/lucassabreu/clockify-cli/api/dto
