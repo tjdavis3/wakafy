@@ -94,6 +94,7 @@ const (
 	userIDField      = field("user id")
 	projectField     = field("project id")
 	timeEntryIDField = field("time entry id")
+	nameField        = field("name")
 )
 
 func required(action string, values map[field]string) error {
@@ -184,6 +185,11 @@ type PaginationParam struct {
 	PageSize int
 }
 
+// AllPages sets the query to retrieve all pages
+func AllPages() PaginationParam {
+	return PaginationParam{AllPages: true}
+}
+
 // LogParam params to query entries
 type LogParam struct {
 	Workspace string
@@ -215,6 +221,7 @@ type LogRangeParam struct {
 	FirstDate   time.Time
 	LastDate    time.Time
 	Description string
+	ProjectID   string
 	PaginationParam
 }
 
@@ -228,6 +235,7 @@ func (c *Client) LogRange(p LogRangeParam) ([]dto.TimeEntry, error) {
 		Start:           &p.FirstDate,
 		End:             &p.LastDate,
 		Description:     p.Description,
+		ProjectID:       p.ProjectID,
 		PaginationParam: p.PaginationParam,
 	})
 }
@@ -239,6 +247,7 @@ type GetUserTimeEntriesParam struct {
 	Start          *time.Time
 	End            *time.Time
 	Description    string
+	ProjectID      string
 
 	PaginationParam
 }
@@ -314,17 +323,20 @@ func (c *Client) getUserTimeEntriesImpl(
 		}
 	}
 
-	c.debugf("GetUserTimeEntries - Workspace: %s | User: %s | In Progress: %s | Description: %s",
+	c.debugf(
+		"GetUserTimeEntries - Workspace: %s | User: %s | In Progress: %s | Description: %s | Project: %s",
 		p.Workspace,
 		p.UserID,
 		inProgressFilter,
 		p.Description,
+		p.ProjectID,
 	)
 
 	r := dto.UserTimeEntriesRequest{
 		OnlyInProgress: p.OnlyInProgress,
 		Hydrated:       &hydrated,
 		Description:    p.Description,
+		Project:        p.ProjectID,
 	}
 
 	if p.Start != nil {
@@ -398,9 +410,10 @@ type GetTimeEntryInProgressParam struct {
 func (c *Client) GetTimeEntryInProgress(p GetTimeEntryInProgressParam) (timeEntryImpl *dto.TimeEntryImpl, err error) {
 	b := true
 	ts, err := c.GetUserTimeEntries(GetUserTimeEntriesParam{
-		Workspace:      p.Workspace,
-		UserID:         p.UserID,
-		OnlyInProgress: &b,
+		Workspace:       p.Workspace,
+		UserID:          p.UserID,
+		OnlyInProgress:  &b,
+		PaginationParam: PaginationParam{PageSize: 1},
 	})
 
 	if err != nil {
@@ -654,6 +667,46 @@ func (c *Client) GetTasks(p GetTasksParam) ([]dto.Task, error) {
 	return ps, err
 }
 
+// AddTaskParam param to add tasks to a project
+type AddTaskParam struct {
+	Workspace string
+	ProjectID string
+	Name      string
+}
+
+func (c *Client) AddTask(p AddTaskParam) (dto.Task, error) {
+	var task dto.Task
+
+	err := required("add task", map[field]string{
+		nameField:      p.Name,
+		workspaceField: p.Workspace,
+		projectField:   p.ProjectID,
+	})
+
+	if err != nil {
+		return task, err
+	}
+
+	req, err := c.NewRequest(
+		"POST",
+		fmt.Sprintf(
+			"v1/workspaces/%s/projects/%s/tasks",
+			p.Workspace,
+			p.ProjectID,
+		),
+		dto.AddTaskRequest{
+			Name: p.Name,
+		},
+	)
+
+	if err != nil {
+		return task, err
+	}
+
+	_, err = c.Do(req, &task, "AddTask")
+	return task, err
+}
+
 // CreateTimeEntryParam params to create a new time entry
 type CreateTimeEntryParam struct {
 	Workspace   string
@@ -755,11 +808,96 @@ func (c *Client) GetTags(p GetTagsParam) ([]dto.Tag, error) {
 	return ps, err
 }
 
+// GetClientsParam params to get all clients of a workspace
+type GetClientsParam struct {
+	Workspace string
+	Name      string
+	Archived  *bool
+
+	PaginationParam
+}
+
+// GetClients gets all clients of a workspace
+func (c *Client) GetClients(p GetClientsParam) ([]dto.Client, error) {
+	var clients, tmpl []dto.Client
+
+	err := required("get clients", map[field]string{
+		workspaceField: p.Workspace,
+	})
+
+	if err != nil {
+		return clients, err
+	}
+
+	err = c.paginate(
+		"GET",
+		fmt.Sprintf(
+			"v1/workspaces/%s/clients",
+			p.Workspace,
+		),
+		p.PaginationParam,
+		dto.GetClientsRequest{
+			Name:     p.Name,
+			Archived: p.Archived,
+		},
+		&tmpl,
+		func(res interface{}) (int, error) {
+			if res == nil {
+				return 0, nil
+			}
+			ls := *res.(*[]dto.Client)
+
+			clients = append(clients, ls...)
+			return len(ls), nil
+		},
+		"GetClients",
+	)
+	return clients, err
+}
+
+type AddClientParam struct {
+	Workspace string
+	Name      string
+}
+
+// AddClient adds a new client to a workspace
+func (c *Client) AddClient(p AddClientParam) (dto.Client, error) {
+	var client dto.Client
+
+	err := required("add client", map[field]string{
+		nameField:      p.Name,
+		workspaceField: p.Workspace,
+	})
+
+	if err != nil {
+		return client, err
+	}
+
+	req, err := c.NewRequest(
+		"POST",
+		fmt.Sprintf(
+			"v1/workspaces/%s/clients",
+			p.Workspace,
+		),
+		dto.AddClientRequest{
+			Name: p.Name,
+		},
+	)
+
+	if err != nil {
+		return client, err
+	}
+
+	_, err = c.Do(req, &client, "AddClient")
+	return client, err
+}
+
 // GetProjectsParam params to get all project of a workspace
 type GetProjectsParam struct {
 	Workspace string
 	Name      string
-	Archived  bool
+	Clients   []string
+	Archived  *bool
 
 	PaginationParam
 }
@@ -786,6 +924,7 @@ func (c *Client) GetProjects(p GetProjectsParam) ([]dto.Project, error) {
 		dto.GetProjectRequest{
 			Name:     p.Name,
 			Archived: p.Archived,
+			Clients:  p.Clients,
 		},
 		&tmpl,
 		func(res interface{}) (int, error) {
@@ -800,6 +939,54 @@ func (c *Client) GetProjects(p GetProjectsParam) ([]dto.Project, error) {
 		"GetProjects",
 	)
 	return ps, err
+}
+
+type AddProjectParam struct {
+	Workspace string
+	Name      string
+	ClientId  string
+	Color     string
+	Note      string
+	Billable  bool
+	Public    bool
+}
+
+// AddProject adds a new project to a workspace
+func (c *Client) AddProject(p AddProjectParam) (dto.Project, error) {
+	var project dto.Project
+
+	err := required("add project", map[field]string{
+		nameField:      p.Name,
+		workspaceField: p.Workspace,
+	})
+
+	if err != nil {
+		return project, err
+	}
+
+	req, err := c.NewRequest(
+		"POST",
+		fmt.Sprintf(
+			"v1/workspaces/%s/projects",
+			p.Workspace,
+		),
+		dto.AddProjectRequest{
+			Name:     p.Name,
+			ClientId: p.ClientId,
+			IsPublic: p.Public,
+			Color:    p.Color,
+			Note:     p.Note,
+			Billable: p.Billable,
+			Public:   p.Public,
+		},
+	)
+
+	if err != nil {
+		return project, err
+	}
+
+	_, err = c.Do(req, &project, "AddProject")
+	return project, err
 }
 
 // OutParam params to end the current time entry
