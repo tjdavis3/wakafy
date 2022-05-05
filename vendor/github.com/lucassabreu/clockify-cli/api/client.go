@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,7 +10,7 @@ import (
 
 	"github.com/lucassabreu/clockify-cli/api/dto"
 	"github.com/lucassabreu/clockify-cli/strhlp"
-	stackedErrors "github.com/pkg/errors"
+	"github.com/pkg/errors"
 )
 
 // Client will help to access Clockify API
@@ -30,12 +29,12 @@ var ErrorMissingAPIKey = errors.New("api Key must be informed")
 // NewClient create a new Client, based on: https://clockify.github.io/clockify_api_docs/
 func NewClient(apiKey string) (*Client, error) {
 	if apiKey == "" {
-		return nil, stackedErrors.WithStack(ErrorMissingAPIKey)
+		return nil, errors.WithStack(ErrorMissingAPIKey)
 	}
 
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, stackedErrors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	c := &Client{
@@ -68,7 +67,7 @@ func (c *Client) GetWorkspaces(f GetWorkspaces) ([]dto.Workspace, error) {
 	_, err = c.Do(r, &w, "GetWorkspaces")
 
 	if err != nil {
-		return w, err
+		return w, errors.Wrap(err, "get workspaces")
 	}
 
 	if f.Name == "" {
@@ -94,6 +93,8 @@ const (
 	userIDField      = field("user id")
 	projectField     = field("project id")
 	timeEntryIDField = field("time entry id")
+	nameField        = field("name")
+	taskIDField      = field("task id")
 )
 
 func required(action string, values map[field]string) error {
@@ -120,7 +121,8 @@ func (c *Client) GetWorkspace(p GetWorkspace) (dto.Workspace, error) {
 
 	ws, err := c.GetWorkspaces(GetWorkspaces{})
 	if err != nil {
-		return dto.Workspace{}, err
+		return dto.Workspace{}, errors.Wrapf(
+			err, "get workspace '%s'", p.ID)
 	}
 
 	for _, w := range ws {
@@ -129,7 +131,9 @@ func (c *Client) GetWorkspace(p GetWorkspace) (dto.Workspace, error) {
 		}
 	}
 
-	return dto.Workspace{}, dto.Error{Message: "not found", Code: 404}
+	return dto.Workspace{}, errors.Wrapf(
+		dto.Error{Message: "not found", Code: 404},
+		"get workspace %s", p.ID)
 }
 
 // WorkspaceUsersParam params to query workspace users
@@ -184,6 +188,11 @@ type PaginationParam struct {
 	PageSize int
 }
 
+// AllPages sets the query to retrieve all pages
+func AllPages() PaginationParam {
+	return PaginationParam{AllPages: true}
+}
+
 // LogParam params to query entries
 type LogParam struct {
 	Workspace string
@@ -215,6 +224,7 @@ type LogRangeParam struct {
 	FirstDate   time.Time
 	LastDate    time.Time
 	Description string
+	ProjectID   string
 	PaginationParam
 }
 
@@ -228,6 +238,7 @@ func (c *Client) LogRange(p LogRangeParam) ([]dto.TimeEntry, error) {
 		Start:           &p.FirstDate,
 		End:             &p.LastDate,
 		Description:     p.Description,
+		ProjectID:       p.ProjectID,
 		PaginationParam: p.PaginationParam,
 	})
 }
@@ -239,6 +250,7 @@ type GetUserTimeEntriesParam struct {
 	Start          *time.Time
 	End            *time.Time
 	Description    string
+	ProjectID      string
 
 	PaginationParam
 }
@@ -314,17 +326,20 @@ func (c *Client) getUserTimeEntriesImpl(
 		}
 	}
 
-	c.debugf("GetUserTimeEntries - Workspace: %s | User: %s | In Progress: %s | Description: %s",
+	c.debugf(
+		"GetUserTimeEntries - Workspace: %s | User: %s | In Progress: %s | Description: %s | Project: %s",
 		p.Workspace,
 		p.UserID,
 		inProgressFilter,
 		p.Description,
+		p.ProjectID,
 	)
 
 	r := dto.UserTimeEntriesRequest{
 		OnlyInProgress: p.OnlyInProgress,
 		Hydrated:       &hydrated,
 		Description:    p.Description,
+		Project:        p.ProjectID,
 	}
 
 	if p.Start != nil {
@@ -398,9 +413,10 @@ type GetTimeEntryInProgressParam struct {
 func (c *Client) GetTimeEntryInProgress(p GetTimeEntryInProgressParam) (timeEntryImpl *dto.TimeEntryImpl, err error) {
 	b := true
 	ts, err := c.GetUserTimeEntries(GetUserTimeEntriesParam{
-		Workspace:      p.Workspace,
-		UserID:         p.UserID,
-		OnlyInProgress: &b,
+		Workspace:       p.Workspace,
+		UserID:          p.UserID,
+		OnlyInProgress:  &b,
+		PaginationParam: PaginationParam{PageSize: 1},
 	})
 
 	if err != nil {
@@ -519,7 +535,8 @@ func (c *Client) GetTag(p GetTagParam) (*dto.Tag, error) {
 		}
 	}
 
-	return nil, stackedErrors.Errorf("tag %s not found on workspace %s", p.TagID, p.Workspace)
+	return nil, errors.Errorf(
+		"tag %s not found on workspace %s", p.TagID, p.Workspace)
 }
 
 // GetProjectParam params to get a Project
@@ -579,7 +596,7 @@ func (c *Client) GetUser(p GetUser) (dto.User, error) {
 		Workspace: p.Workspace,
 	})
 	if err != nil {
-		return dto.User{}, err
+		return dto.User{}, errors.Wrapf(err, "get user %s", p.UserID)
 	}
 
 	for _, u := range us {
@@ -588,7 +605,9 @@ func (c *Client) GetUser(p GetUser) (dto.User, error) {
 		}
 	}
 
-	return dto.User{}, dto.Error{Message: "not found", Code: 404}
+	return dto.User{}, errors.Wrapf(
+		dto.Error{Message: "not found", Code: 404},
+		"get user %s", p.UserID)
 }
 
 // GetMe get details about the user who created the token
@@ -652,6 +671,212 @@ func (c *Client) GetTasks(p GetTasksParam) ([]dto.Task, error) {
 		"GetTasks",
 	)
 	return ps, err
+}
+
+// GetTaskParam param to get a task on a project
+type GetTaskParam struct {
+	Workspace string
+	ProjectID string
+	TaskID    string
+}
+
+// GetTasks get tasks of a project
+func (c *Client) GetTask(p GetTaskParam) (dto.Task, error) {
+	var t dto.Task
+
+	err := required("get task", map[field]string{
+		workspaceField: p.Workspace,
+		projectField:   p.ProjectID,
+		taskIDField:    p.TaskID,
+	})
+
+	if err != nil {
+		return t, err
+	}
+
+	r, err := c.NewRequest(
+		"GET",
+		fmt.Sprintf(
+			"v1/workspaces/%s/projects/%s/tasks/%s",
+			p.Workspace,
+			p.ProjectID,
+			p.TaskID,
+		),
+		nil,
+	)
+
+	if err != nil {
+		return t, err
+	}
+
+	_, err = c.Do(r, &t, "GetTask")
+	return t, err
+}
+
+type TaskStatus string
+
+const (
+	TaskStatusDefault = ""
+	TaskStatusDone    = "DONE"
+	TaskStatusActive  = "ACTIVE"
+)
+
+// AddTaskParam param to add tasks to a project
+type AddTaskParam struct {
+	Workspace   string
+	ProjectID   string
+	Name        string
+	AssigneeIDs *[]string
+	Estimate    *time.Duration
+	Status      TaskStatus
+	Billable    *bool
+}
+
+func (c *Client) AddTask(p AddTaskParam) (dto.Task, error) {
+	var task dto.Task
+
+	err := required("add task", map[field]string{
+		nameField:      p.Name,
+		workspaceField: p.Workspace,
+		projectField:   p.ProjectID,
+	})
+
+	if err != nil {
+		return task, err
+	}
+
+	r := dto.AddTaskRequest{
+		Name:        p.Name,
+		AssigneeIDs: p.AssigneeIDs,
+		Billable:    p.Billable,
+	}
+
+	if p.Status != TaskStatus("") {
+		s := string(p.Status)
+		r.Status = &s
+	}
+
+	if p.Estimate != nil {
+		e := dto.Duration{Duration: *p.Estimate}
+		r.Estimate = &e
+	}
+
+	req, err := c.NewRequest(
+		"POST",
+		fmt.Sprintf(
+			"v1/workspaces/%s/projects/%s/tasks",
+			p.Workspace,
+			p.ProjectID,
+		),
+		r,
+	)
+
+	if err != nil {
+		return task, err
+	}
+
+	_, err = c.Do(req, &task, "AddTask")
+	return task, err
+}
+
+// UpdateTaskParam param to update tasks to a project
+type UpdateTaskParam struct {
+	Workspace   string
+	ProjectID   string
+	TaskID      string
+	Name        string
+	AssigneeIDs *[]string
+	Estimate    *time.Duration
+	Status      TaskStatus
+	Billable    *bool
+}
+
+func (c *Client) UpdateTask(p UpdateTaskParam) (dto.Task, error) {
+	var task dto.Task
+
+	err := required("update task", map[field]string{
+		nameField:      p.Name,
+		taskIDField:    p.TaskID,
+		workspaceField: p.Workspace,
+		projectField:   p.ProjectID,
+	})
+
+	if err != nil {
+		return task, err
+	}
+
+	r := dto.UpdateTaskRequest{
+		Name:        p.Name,
+		AssigneeIDs: p.AssigneeIDs,
+		Billable:    p.Billable,
+	}
+
+	if p.Status != TaskStatus("") {
+		s := string(p.Status)
+		r.Status = &s
+	}
+
+	if p.Estimate != nil {
+		e := dto.Duration{Duration: *p.Estimate}
+		r.Estimate = &e
+	}
+
+	req, err := c.NewRequest(
+		"PUT",
+		fmt.Sprintf(
+			"v1/workspaces/%s/projects/%s/tasks/%s",
+			p.Workspace,
+			p.ProjectID,
+			p.TaskID,
+		),
+		r,
+	)
+
+	if err != nil {
+		return task, err
+	}
+
+	_, err = c.Do(req, &task, "UpdateTask")
+	return task, err
+}
+
+// DeleteTaskParam param to update tasks to a project
+type DeleteTaskParam struct {
+	Workspace string
+	ProjectID string
+	TaskID    string
+}
+
+func (c *Client) DeleteTask(p DeleteTaskParam) (dto.Task, error) {
+	var task dto.Task
+
+	err := required("delete task", map[field]string{
+		taskIDField:    p.TaskID,
+		workspaceField: p.Workspace,
+		projectField:   p.ProjectID,
+	})
+
+	if err != nil {
+		return task, err
+	}
+
+	req, err := c.NewRequest(
+		"DELETE",
+		fmt.Sprintf(
+			"v1/workspaces/%s/projects/%s/tasks/%s",
+			p.Workspace,
+			p.ProjectID,
+			p.TaskID,
+		),
+		nil,
+	)
+
+	if err != nil {
+		return task, err
+	}
+
+	_, err = c.Do(req, &task, "DeleteTask")
+	return task, err
 }
 
 // CreateTimeEntryParam params to create a new time entry
@@ -755,11 +980,96 @@ func (c *Client) GetTags(p GetTagsParam) ([]dto.Tag, error) {
 	return ps, err
 }
 
+// GetClientsParam params to get all clients of a workspace
+type GetClientsParam struct {
+	Workspace string
+	Name      string
+	Archived  *bool
+
+	PaginationParam
+}
+
+// GetClients gets all clients of a workspace
+func (c *Client) GetClients(p GetClientsParam) ([]dto.Client, error) {
+	var clients, tmpl []dto.Client
+
+	err := required("get clients", map[field]string{
+		workspaceField: p.Workspace,
+	})
+
+	if err != nil {
+		return clients, err
+	}
+
+	err = c.paginate(
+		"GET",
+		fmt.Sprintf(
+			"v1/workspaces/%s/clients",
+			p.Workspace,
+		),
+		p.PaginationParam,
+		dto.GetClientsRequest{
+			Name:     p.Name,
+			Archived: p.Archived,
+		},
+		&tmpl,
+		func(res interface{}) (int, error) {
+			if res == nil {
+				return 0, nil
+			}
+			ls := *res.(*[]dto.Client)
+
+			clients = append(clients, ls...)
+			return len(ls), nil
+		},
+		"GetClients",
+	)
+	return clients, err
+}
+
+type AddClientParam struct {
+	Workspace string
+	Name      string
+}
+
+// AddClient adds a new client to a workspace
+func (c *Client) AddClient(p AddClientParam) (dto.Client, error) {
+	var client dto.Client
+
+	err := required("add client", map[field]string{
+		nameField:      p.Name,
+		workspaceField: p.Workspace,
+	})
+
+	if err != nil {
+		return client, err
+	}
+
+	req, err := c.NewRequest(
+		"POST",
+		fmt.Sprintf(
+			"v1/workspaces/%s/clients",
+			p.Workspace,
+		),
+		dto.AddClientRequest{
+			Name: p.Name,
+		},
+	)
+
+	if err != nil {
+		return client, err
+	}
+
+	_, err = c.Do(req, &client, "AddClient")
+	return client, err
+}
+
 // GetProjectsParam params to get all project of a workspace
 type GetProjectsParam struct {
 	Workspace string
 	Name      string
-	Archived  bool
+	Clients   []string
+	Archived  *bool
 
 	PaginationParam
 }
@@ -786,6 +1096,7 @@ func (c *Client) GetProjects(p GetProjectsParam) ([]dto.Project, error) {
 		dto.GetProjectRequest{
 			Name:     p.Name,
 			Archived: p.Archived,
+			Clients:  p.Clients,
 		},
 		&tmpl,
 		func(res interface{}) (int, error) {
@@ -800,6 +1111,54 @@ func (c *Client) GetProjects(p GetProjectsParam) ([]dto.Project, error) {
 		"GetProjects",
 	)
 	return ps, err
+}
+
+type AddProjectParam struct {
+	Workspace string
+	Name      string
+	ClientId  string
+	Color     string
+	Note      string
+	Billable  bool
+	Public    bool
+}
+
+// AddProject adds a new project to a workspace
+func (c *Client) AddProject(p AddProjectParam) (dto.Project, error) {
+	var project dto.Project
+
+	err := required("add project", map[field]string{
+		nameField:      p.Name,
+		workspaceField: p.Workspace,
+	})
+
+	if err != nil {
+		return project, err
+	}
+
+	req, err := c.NewRequest(
+		"POST",
+		fmt.Sprintf(
+			"v1/workspaces/%s/projects",
+			p.Workspace,
+		),
+		dto.AddProjectRequest{
+			Name:     p.Name,
+			ClientId: p.ClientId,
+			IsPublic: p.Public,
+			Color:    p.Color,
+			Note:     p.Note,
+			Billable: p.Billable,
+			Public:   p.Public,
+		},
+	)
+
+	if err != nil {
+		return project, err
+	}
+
+	_, err = c.Do(req, &project, "AddProject")
+	return project, err
 }
 
 // OutParam params to end the current time entry
