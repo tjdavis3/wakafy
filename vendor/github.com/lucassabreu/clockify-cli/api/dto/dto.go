@@ -143,7 +143,7 @@ const TaskStatusDone = TaskStatus("DONE")
 // Task DTO
 type Task struct {
 	AssigneeIDs []string   `json:"assigneeIds"`
-	Estimate    string     `json:"estimate"`
+	Estimate    Duration   `json:"estimate"`
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	ProjectID   string     `json:"projectId"`
@@ -151,6 +151,14 @@ type Task struct {
 	HourlyRate  Rate       `json:"hourlyRate"`
 	CostRate    Rate       `json:"costRate"`
 	Status      TaskStatus `json:"status"`
+}
+
+// Client DTO
+type Client struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	WorkspaceID string `json:"workspaceId"`
+	Archived    bool   `json:"archived"`
 }
 
 // Project DTO
