@@ -131,6 +131,10 @@ type Tag struct {
 	WorkspaceID string `json:"workspaceId"`
 }
 
+func (e Tag) GetID() string   { return e.ID }
+func (e Tag) GetName() string { return e.Name }
+func (e Tag) String() string  { return e.Name + " (" + e.ID + ")" }
+
 // TaskStatus task status
 type TaskStatus string
 
@@ -143,7 +147,7 @@ const TaskStatusDone = TaskStatus("DONE")
 // Task DTO
 type Task struct {
 	AssigneeIDs []string   `json:"assigneeIds"`
-	Estimate    string     `json:"estimate"`
+	Estimate    Duration   `json:"estimate"`
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	ProjectID   string     `json:"projectId"`
@@ -152,6 +156,20 @@ type Task struct {
 	CostRate    Rate       `json:"costRate"`
 	Status      TaskStatus `json:"status"`
 }
+
+func (e Task) GetID() string   { return e.ID }
+func (e Task) GetName() string { return e.Name }
+
+// Client DTO
+type Client struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	WorkspaceID string `json:"workspaceId"`
+	Archived    bool   `json:"archived"`
+}
+
+func (e Client) GetID() string   { return e.ID }
+func (e Client) GetName() string { return e.Name }
 
 // Project DTO
 type Project struct {
@@ -172,6 +190,9 @@ type Project struct {
 	Template       bool           `json:"template"`
 	Public         bool           `json:"public"`
 }
+
+func (p Project) GetID() string   { return p.ID }
+func (p Project) GetName() string { return p.Name }
 
 // EstimateType possible Estimate types
 type EstimateType string
@@ -226,6 +247,9 @@ type User struct {
 	Status           UserStatus   `json:"status"`
 	Roles            *[]Role      `json:"roles"`
 }
+
+func (e User) GetID() string   { return e.ID }
+func (e User) GetName() string { return e.Name }
 
 // Role DTO
 type Role struct {

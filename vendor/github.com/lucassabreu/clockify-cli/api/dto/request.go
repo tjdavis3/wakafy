@@ -1,9 +1,13 @@
 package dto
 
 import (
+	"encoding/json"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // DateTime is a time presentation for parameters
@@ -18,6 +22,60 @@ func (d DateTime) MarshalJSON() ([]byte, error) {
 
 func (d DateTime) String() string {
 	return d.Time.UTC().Format("2006-01-02T15:04:05Z")
+}
+
+// Duration is a time presentation for parameters
+type Duration struct {
+	time.Duration
+}
+
+// MarshalJSON converts Duration correctly
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + d.String() + "\""), nil
+}
+
+// UnmarshalJSON converts a JSON value to Duration correctly
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return errors.Wrap(err, "unmarshal duration")
+	}
+
+	if len(s) < 4 {
+		return errors.Errorf("duration %s is invalid", b)
+	}
+
+	var u, dc time.Duration
+	var j, i int
+	for ; i < len(s); i++ {
+		switch s[i] {
+		case 'P', 'T':
+			j = i + 1
+			continue
+		case 'H':
+			u = time.Hour
+		case 'M':
+			u = time.Minute
+		case 'S':
+			u = time.Second
+		default:
+			continue
+		}
+
+		v, err := strconv.Atoi(s[j:i])
+		if err != nil {
+			return errors.Wrap(err, "unmarshal duration")
+		}
+		dc = dc + time.Duration(v)*u
+		j = i + 1
+	}
+
+	*d = Duration{Duration: dc}
+	return nil
+}
+
+func (d Duration) String() string {
+	return "PT" + strings.ToUpper(d.Duration.String())
 }
 
 type pagination struct {
@@ -185,9 +243,46 @@ type UpdateTimeEntryRequest struct {
 	CustomFields []CustomField `json:"customFields,omitempty"`
 }
 
+type GetClientsRequest struct {
+	Name     string
+	Archived *bool
+
+	pagination
+}
+
+// WithPagination add pagination to the GetClientsRequest
+func (r GetClientsRequest) WithPagination(page, size int) PaginatedRequest {
+	r.pagination = newPagination(page, size)
+	return r
+}
+
+// AppendToQuery decorates the URL with the query string needed for this Request
+func (r GetClientsRequest) AppendToQuery(u url.URL) url.URL {
+	u = r.pagination.AppendToQuery(u)
+
+	v := u.Query()
+
+	if r.Name != "" {
+		v.Add("name", r.Name)
+	}
+
+	if r.Archived != nil {
+		v.Add("archived", boolString[*r.Archived])
+	}
+
+	u.RawQuery = v.Encode()
+
+	return u
+}
+
+type AddClientRequest struct {
+	Name string `json:"name"`
+}
+
 type GetProjectRequest struct {
 	Name     string
-	Archived bool
+	Archived *bool
+	Clients  []string
 
 	pagination
 }
@@ -198,14 +293,27 @@ func (r GetProjectRequest) WithPagination(page, size int) PaginatedRequest {
 	return r
 }
 
+var boolString = map[bool]string{
+	true:  "true",
+	false: "false",
+}
+
 // AppendToQuery decorates the URL with the query string needed for this Request
 func (r GetProjectRequest) AppendToQuery(u url.URL) url.URL {
 	u = r.pagination.AppendToQuery(u)
 
 	v := u.Query()
-	v.Add("name", r.Name)
-	if r.Archived {
-		v.Add("archived", "true")
+
+	if r.Name != "" {
+		v.Add("name", r.Name)
+	}
+
+	if r.Archived != nil {
+		v.Add("archived", boolString[*r.Archived])
+	}
+
+	if len(r.Clients) > 0 {
+		v.Add("clients", strings.Join(r.Clients, ","))
 	}
 
 	u.RawQuery = v.Encode()
@@ -213,9 +321,19 @@ func (r GetProjectRequest) AppendToQuery(u url.URL) url.URL {
 	return u
 }
 
+type AddProjectRequest struct {
+	Name     string `json:"name"`
+	ClientId string `json:"clientId,omitempty"`
+	IsPublic bool   `json:"isPublic"`
+	Color    string `json:"color,omitempty"`
+	Note     string `json:"note,omitempty"`
+	Billable bool   `json:"billable"`
+	Public   bool   `json:"public"`
+}
+
 type GetTagsRequest struct {
 	Name     string
-	Archived bool
+	Archived *bool
 
 	pagination
 }
@@ -232,8 +350,8 @@ func (r GetTagsRequest) AppendToQuery(u url.URL) url.URL {
 
 	v := u.Query()
 	v.Add("name", r.Name)
-	if r.Archived {
-		v.Add("archived", "true")
+	if r.Archived != nil {
+		v.Add("archived", boolString[*r.Archived])
 	}
 
 	u.RawQuery = v.Encode()
@@ -241,6 +359,7 @@ func (r GetTagsRequest) AppendToQuery(u url.URL) url.URL {
 	return u
 }
 
+// GetTasksRequest represents the query filters to search tasks of a project
 type GetTasksRequest struct {
 	Name   string
 	Active bool
@@ -261,12 +380,28 @@ func (r GetTasksRequest) AppendToQuery(u url.URL) url.URL {
 	v := u.Query()
 	v.Add("name", r.Name)
 	if r.Active {
-		v.Add("active", "true")
+		v.Add("is-active", "true")
 	}
 
 	u.RawQuery = v.Encode()
 
 	return u
+}
+
+type AddTaskRequest struct {
+	Name        string    `json:"name"`
+	AssigneeIDs *[]string `json:"assigneeIds,omitempty"`
+	Billable    *bool     `json:"billable,omitempty"`
+	Estimate    *Duration `json:"estimate,omitempty"`
+	Status      *string   `json:"status,omitempty"`
+}
+
+type UpdateTaskRequest struct {
+	Name        string    `json:"name"`
+	AssigneeIDs *[]string `json:"assigneeIds,omitempty"`
+	Billable    *bool     `json:"billable,omitempty"`
+	Estimate    *Duration `json:"estimate,omitempty"`
+	Status      *string   `json:"status,omitempty"`
 }
 
 type ChangeTimeEntriesInvoicedRequest struct {
