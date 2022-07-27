@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/lucassabreu/clockify-cli/api/dto"
 	"github.com/pkg/errors"
@@ -35,8 +34,8 @@ func (t transport) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // NewRequest to be used in Client
-func (c *Client) NewRequest(method, uri string, body interface{}) (*http.Request, error) {
-	u, err := c.baseURL.Parse(strings.Join([]string{c.baseURL.Path, uri}, "/"))
+func (c *client) NewRequest(method, uri string, body interface{}) (*http.Request, error) {
+	u, err := c.baseURL.Parse(c.baseURL.Path + "/" + uri)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +55,7 @@ func (c *Client) NewRequest(method, uri string, body interface{}) (*http.Request
 		if err != nil {
 			return nil, err
 		}
-		c.debugf("request body: %s", buf.(*bytes.Buffer))
+		c.infof("request body: %s", buf.(*bytes.Buffer))
 	}
 
 	req, err := http.NewRequest(method, u.String(), buf)
@@ -73,7 +72,8 @@ func (c *Client) NewRequest(method, uri string, body interface{}) (*http.Request
 }
 
 // Do executes a http.Request inside the Clockify's Client
-func (c *Client) Do(req *http.Request, v interface{}, name string) (*http.Response, error) {
+func (c *client) Do(
+	req *http.Request, v interface{}, name string) (*http.Response, error) {
 	r, err := c.Client.Do(req)
 	if err != nil {
 		return r, err
@@ -87,7 +87,13 @@ func (c *Client) Do(req *http.Request, v interface{}, name string) (*http.Respon
 		return nil, errors.WithStack(err)
 	}
 
-	c.debugf("name: %s, method: %s, url: %s, status: %d, response: \"%s\"", name, req.Method, req.URL.String(), r.StatusCode, buf)
+	if c.debugLogger != nil {
+		c.debugf("name: %s, method: %s, url: %s, status: %d, response: \"%s\"",
+			name, req.Method, req.URL.String(), r.StatusCode, buf)
+	} else {
+		c.infof("name: %s, method: %s, url: %s, status: %d",
+			name, req.Method, req.URL.String(), r.StatusCode)
+	}
 
 	decoder := json.NewDecoder(buf)
 
