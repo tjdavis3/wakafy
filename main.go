@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"time"
 
@@ -93,7 +94,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	app.Workspace = app.GetWorkspace(args[0])
+	app.Workspace, err = app.GetWorkspace(args[0])
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	projParam := clockify.GetProjectsParam{
 		Workspace: app.Workspace,
@@ -117,12 +121,13 @@ func main() {
 	}
 }
 
-func (app *App) GetWorkspace(workspace string) (workspaceID string) {
+// GetWorkspace returns the workspace ID for the given workspace name.
+// Returns an error if it is not found or there is an error communicating with clockify.
+func (app *App) GetWorkspace(workspace string) (workspaceID string, err error) {
 	params := clockify.GetWorkspaces{Name: workspace}
 	workspaces, err := app.ClockClient.GetWorkspaces(params)
 	if err != nil {
-		fmt.Println("Could not load workspaces")
-		os.Exit(2)
+		return "", fmt.Errorf("Could not load workspaces: %w", err)
 	}
 	var ID string
 	for _, ws := range workspaces {
@@ -132,10 +137,20 @@ func (app *App) GetWorkspace(workspace string) (workspaceID string) {
 		}
 	}
 	if ID == "" {
-		fmt.Println("Could not find workspace")
-		os.Exit(1)
+		return "", fmt.Errorf("Could not find workspace")
 	}
-	return ID
+	return ID, nil
+}
+
+// FindProjectID searches for the ID that corresponds to projectName
+// and returns it or nil if not found
+func (app *App) FindProjectID(projectName string) *string {
+	for _, proj := range app.ClockProjects {
+		if projectName == proj.Name {
+			return &proj.ID
+		}
+	}
+	return nil
 }
 
 // AddTime takes a wakatime durations and adds them to Clockify
@@ -146,19 +161,16 @@ func (app *App) AddTime(summaries *wakatime.Durations) {
 	// }
 	for _, entry := range summaries.Data {
 		// for _, project := range entry.Projects {
-		addProject := true
+		addProject := false
 		project, ok := app.ProjectMappings[entry.Project]
 		if !ok {
 			project = entry.Project
 		}
-		var projectID *string
-		for _, proj := range app.ClockProjects {
-			if project == proj.Name {
-				addProject = false
-				projectID = &proj.ID
-				break
-			}
+		projectID := app.FindProjectID(project)
+		if projectID == nil {
+			addProject = true
 		}
+
 		if addProject {
 			// fmt.Println("Adding Project", entry.Project)
 			app.ClockProjects = append(app.ClockProjects, dto.Project{Name: entry.Project})
